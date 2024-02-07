@@ -14,6 +14,7 @@ def test(model, loss_fn, test_loader, device):
     # Run on validation set
     with torch.no_grad():
         for values, labels in test_loader:
+            # values = values[0]
             values = values.float().to(device)
             labels = labels.long().to(device)
             outputs = model(values)
@@ -32,6 +33,7 @@ def train(n_epochs, optimizer, model, loss_fn, train_loader, test_loader, schedu
         print('epoch ', epoch)
         loss_train = 0.0
         for values, labels in train_loader:
+            # values = values[0]
             values = values.float().to(device)
             labels = labels.long().to(device)  # assuming labels are of type LongTensor
             labels = F.one_hot(labels, num_classes=2).float()  # One-hot encode the labels

@@ -1,6 +1,7 @@
 import os
 from torch.utils.data import Dataset
 import pandas as pd
+from preprocessing import preprocess
 
 class custom_dataset(Dataset):
     def __init__(self, data_folder, transform=None):
@@ -25,12 +26,20 @@ class custom_dataset(Dataset):
                 labels = []
                 # Check if subfolder is named "Focused" or "Unfocused"
                 if subfolder == "Focused":
+
                     values, labels = self.getDataFromFile(file_path, true_value, transform)
+
+
                 elif subfolder == "Unfocused":
+
                     values, labels = self.getDataFromFile(file_path, false_value, transform)
+
+
 
                 self.values += values
                 self.labels += labels
+
+
 
         print("Dataset loaded")
 
@@ -64,31 +73,33 @@ class custom_dataset(Dataset):
 
         # Read in the cleaned csv file
         df = pd.read_csv('outputClean.csv')
+
         #drop first column
         df = df.drop(df.columns[0], axis=1)
-        #drop last two
-        df = df.drop(df.columns[-1], axis=1)
-        df = df.drop(df.columns[-1], axis=1)
+
+        #only keep EXG channels
+        # df = df.drop(['Accel_Channel_0', 'Accel_Channel_1', 'Accel_Channel_2', 'Sample_Index', 'Timestamp', 'Timestamp_(Formatted)'], axis=1)
+
+
         #drop first row
         df = df.drop(df.index[0])
 
         final_values = []
         final_labels = []
-
-        #iterate through each line in clean csv
-        for index, line in df.iterrows():
-            #append to values an array of all sensor values for each sample
-            values = line.values
-            #convert ndarray vallues to an array of floats
-            # values = values.astype(float)
-
+        subdfs = custom_dataset.split_dataframe(df, 1000)
+        for cur_df in subdfs:
+            values = preprocess(cur_df, ['EXG_Channel_0', 'EXG_Channel_1', 'EXG_Channel_2', 'EXG_Channel_3'], num_samples=1000)
             final_values += [values]
-
-            # append to focused a boolean value indicating whether the user was focused or not
             final_labels.append(is_focused)
 
-
         return final_values, final_labels
+
+    # Takes a dataframe and a number of rows per split and returns a list of dataframes wherein each dataframe has the saem column names as the input but only the stipulated amount fo rows, discarding extra rows
+    @staticmethod
+    def split_dataframe(df, num_rows_per_split = 1000):
+        return [df[i:i + num_rows_per_split] for i in range(0, df.shape[0], num_rows_per_split)]
+
+
 
     def __len__(self):
         return len(self.values)

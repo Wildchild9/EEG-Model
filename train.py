@@ -7,22 +7,36 @@ from model import eeg_model
 from custom_dataset import custom_dataset
 import torch.nn.functional as F
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
+
 
 def test(model, loss_fn, test_loader, device):
-    model.eval()  # Set model to evaluation mode
-    val_loss = 0.0
-    # Run on validation set
+    # test the model
+    model.eval()  # set the model to evaluation mode
+    test_loss = 0
+    correct = 0
+    predictions = []
+    targets = []
     with torch.no_grad():
         for values, labels in test_loader:
-            # values = values[0]
             values = values.float().to(device)
-            labels = labels.long().to(device)
+            labels = labels.float().to(device)
+            # labels = F.one_hot(labels, num_classes=2).float()
             outputs = model(values)
-            labels = F.one_hot(labels, num_classes=2).float()
-            val_loss += loss_fn(outputs, labels)
-    val_loss = val_loss / len(test_loader)
-    return val_loss
-
+            outputs = outputs.squeeze(1)
+            test_loss += loss_fn(outputs, labels).item()
+            pred = outputs.round()
+            correct += pred.eq(labels.view_as(pred)).sum().item()
+            predictions.extend(pred.cpu().numpy())
+            targets.extend(labels.cpu().numpy())
+    accuracy = 100. * correct / len(test_loader.dataset)
+    print('Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'
+            .format(test_loss/len(test_loader), correct, len(test_loader.dataset), accuracy)
+    )
+    confusion = confusion_matrix(targets, predictions)
+    print('Confusion Matrix:')
+    print(confusion)
+    return accuracy
 
 
 def train(n_epochs, optimizer, model, loss_fn, train_loader, test_loader, scheduler, device, output_plot_path, param_file):
@@ -35,9 +49,10 @@ def train(n_epochs, optimizer, model, loss_fn, train_loader, test_loader, schedu
         for values, labels in train_loader:
             # values = values[0]
             values = values.float().to(device)
-            labels = labels.long().to(device)  # assuming labels are of type LongTensor
-            labels = F.one_hot(labels, num_classes=2).float()  # One-hot encode the labels
+            labels = labels.float().to(device)  # assuming labels are of type LongTensor
+            # labels = F.one_hot(labels, num_classes=2).float()  # One-hot encode the labels
             outputs = model(values)
+            outputs = outputs.squeeze(1)
             loss = loss_fn(outputs, labels)
             optimizer.zero_grad()
             loss.backward()
@@ -47,15 +62,17 @@ def train(n_epochs, optimizer, model, loss_fn, train_loader, test_loader, schedu
         scheduler.step()
 
         losses_train += [loss_train/len(train_loader)] # update value of losses
-        validation_accuracy = test(model, loss_fn, test_loader, device)
-        print('Epoch: {}, Training loss: {}, Validation loss: {}'
-              .format(epoch, loss_train/len(train_loader), validation_accuracy)
+        # validation_accuracy = test(model, loss_fn, test_loader, device)
+        print('Epoch: {}, Training loss: {}'
+              .format(epoch, loss_train/len(train_loader))
         )
 
     # plot output of training and save to output_plot_path file
     torch.save(model.state_dict(), param_file)
     plt.plot(losses_train)
     plt.savefig(output_plot_path)
+    # Save the model as a .pth file
+    # filename = 'model' + str(model_number) + '.pth'
 
 
 # class Focus:
@@ -104,7 +121,12 @@ def main():
     device = torch.device("cpu")
     # Assuming you have the necessary model, optimizer, loss_fn, train_loader, scheduler, and device defined
 
-    train(n_epochs, optimizer, model, loss_fn, train_loader, test_loader, scheduler, device, output_plot_path, model_output_path)
+    # train(n_epochs, optimizer, model, loss_fn, train_loader, test_loader, scheduler, device, output_plot_path, model_output_path)
+    # accuracy = test(model, loss_fn, test_loader, device)
+
+    train(n_epochs, optimizer, model, loss_fn, train_loader, test_loader, scheduler, device, output_plot_path, "model.pth")
+    accuracy = test(model, loss_fn, test_loader, device)
+    print(f"Accuracy: {accuracy}")
 
 # Execute the main method if this script is run directly
 if __name__ == '__main__':

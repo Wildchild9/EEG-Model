@@ -3,6 +3,9 @@ from torch.utils.data import Dataset
 import pandas as pd
 from preprocessing import preprocess
 
+sample_rate = 200
+num_sec = 1
+
 class custom_dataset(Dataset):
     def __init__(self, data_folder, transform=None):
         super().__init__()
@@ -15,6 +18,7 @@ class custom_dataset(Dataset):
         self.labels = []
         true_value = 1
         false_value = 0
+        
 
         # iterate through subdirectories of data_folder,
         for subfolder in os.listdir(data_folder):
@@ -86,9 +90,9 @@ class custom_dataset(Dataset):
 
         final_values = []
         final_labels = []
-        subdfs = custom_dataset.split_dataframe(df, 1000)
+        subdfs = custom_dataset.split_dataframe(df, num_sec * sample_rate)
         for cur_df in subdfs:
-            values = preprocess(cur_df, ['EXG_Channel_0', 'EXG_Channel_1', 'EXG_Channel_2', 'EXG_Channel_3'], num_samples=1000)
+            values = preprocess(cur_df, ['EXG_Channel_0', 'EXG_Channel_1', 'EXG_Channel_2', 'EXG_Channel_3'], num_samples=num_sec * sample_rate)
             final_values += [values]
             final_labels.append(is_focused)
 
@@ -96,7 +100,7 @@ class custom_dataset(Dataset):
 
     # Takes a dataframe and a number of rows per split and returns a list of dataframes wherein each dataframe has the saem column names as the input but only the stipulated amount fo rows, discarding extra rows
     @staticmethod
-    def split_dataframe(df, num_rows_per_split = 1000):
+    def split_dataframe(df, num_rows_per_split = num_sec * sample_rate):
         return [df[i:i + num_rows_per_split] for i in range(0, df.shape[0], num_rows_per_split)]
 
 
